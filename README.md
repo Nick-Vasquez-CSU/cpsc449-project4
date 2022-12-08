@@ -1,9 +1,9 @@
-### Backend Project 3
+### Backend Project 4
 
-| Group 6         |
+| Group 1         |
 | --------------- |
-| Himani Tawade   |
-| Satish Bisa     |
+| Mike Ploythai   |
+| Krishna Bhatia  |
 | Nick Vasquez    |
 
 ##### HOW TO RUN THE PROJECT
