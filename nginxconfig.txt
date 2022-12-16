@@ -27,7 +27,11 @@ server {
         auth_request /auth;
         proxy_pass http://gameservice;
     }
-
+    
+    location /registerURL {
+    	auth_request /auth;
+    	proxy_pass http://gameservice;
+    }
 
     location = /auth {
            internal;

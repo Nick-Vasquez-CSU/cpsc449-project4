@@ -2,8 +2,10 @@
 import dataclasses
 
 import redis
-
-
+import httpx
+import socket
+import os
+from time import sleep
 # Necessary quart imports
 
 from quart import Quart, request
@@ -12,8 +14,13 @@ from quart_schema import QuartSchema, validate_request
 
 
 app = Quart(__name__)
-
 QuartSchema(app)
+res = None
+while res is None:
+    try:
+#    Get url and put into socket     res =
+    except httpx.RequestError:
+        sleep(5)
 
 
 # Initialize redis client

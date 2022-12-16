@@ -5,6 +5,7 @@ import databases
 import toml
 import itertools
 import random
+import httpx
 from itertools import cycle
 from quart import Quart, abort, g, request
 from quart_schema import QuartSchema, validate_request
@@ -24,16 +25,20 @@ class Guess:
     gameid: str
     word: str
 
-dbList = []    
-    
+@dataclasses.dataclass
+class Url:
+    url: str
+
+dbList = []
+
 async def _get_write_db():
     db = getattr(g, "_sqlite_db", None)
     if db is None:
         db = g._sqlite_db = databases.Database(app.config["DATABASES"]["PRIMARY"])
         await db.connect()
     return db
-    
-    
+
+
 async def _get_read_dbs():
     db = getattr(g, "_sqlite_db", None)
     if db is None:
@@ -258,7 +263,7 @@ async def my_game():
         db = random.choice(dbList)
         print("db: " + str(db))
 
-        
+
         gameid = request.args.get("id")
 
         results = await db.fetch_all(
@@ -281,6 +286,26 @@ async def my_game():
             {"WWW-Authenticate": 'Basic realm = "Login required"'},
         )
 
+@app.route("/registerURL", methods=["POST"])
+@validate_request(Url)
+async def register(data):
+    auth = request.authorization
+    if auth and auth.username and auth.password:
+        db = await _get_db()
+        url = dataclasses.asdict(data)
+        await db.execute("INSERT INTO callbackurls(curl, username) VALUES(:curl, :username)", values={"curl":url.get('url'), "username":auth.username})
+
+        return "Registered URL",200
+    else:
+        return (
+            {"error": "User not verified"},
+            401,
+            {"WWW-Authenticate": 'Basic realm = "Login required"'},
+        )
+
+@app.route("/leaderboardConnect", methods=["POST"])
+async def leadCon():
+    return ",200"
 
 @app.errorhandler(409)
 def conflict(e):
