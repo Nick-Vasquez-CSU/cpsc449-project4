@@ -5,6 +5,7 @@ import redis
 import httpx
 import socket
 import os
+import json
 from time import sleep
 # Necessary quart imports
 
@@ -16,14 +17,14 @@ from quart_schema import QuartSchema, validate_request
 app = Quart(__name__)
 QuartSchema(app)
 res = None
-while res is None:
-    try:
-        res = httpx.post("http://"+socket.getfqdn("127.0.0.1:5200/fullsend"))
-        print(res)
+#while res is None:
+#    try:
+#        res = httpx.post("http://"+socket.getfqdn("127.0.0.1:5200/fullsend"))
+#        print(res)
 #    Get url and put into socket     res =
-    except httpx.RequestError:
-        print("Retrying httpx in 5 seconds...")
-        sleep(5)
+#    except httpx.RequestError:
+#        print("Retrying httpx in 5 seconds...")
+#        sleep(5)
 
 
 # Initialize redis client
@@ -47,6 +48,8 @@ class LeaderInfo:
 
 async def Results(data: LeaderInfo):
 
+    r = httpx.get("http://127.0.0.1:5100/results", timeout=None)
+    print(r)
     auth = request.authorization
 
     if auth and auth.username and auth.password:

@@ -7,6 +7,7 @@ import itertools
 import random
 import httpx
 import os
+import json
 from itertools import cycle
 from quart import Quart, abort, g, request
 from quart_schema import QuartSchema, validate_request
@@ -136,6 +137,12 @@ async def add_guess(data):
             except sqlite3.IntegrityError as e:
                 abort(404, e)
 
+            guessCount = await db.fetch_one("SELECT guesses FROM game WHERE gameid = :gameid", values={"gameid":currGame["gameid"]})
+            gameShipment = {"user" : auth.username, "guesses" : guessCount[0]}
+            print("Attemping to ship out data: ")
+            print(gameShipment)
+            r = await httpx.post("http://127.0.0.1:5200/payload", data=json.dumps(gameShipment), headers={'Content-Type': 'application/json'})
+
             return {
                 "guessedWord": currGame["word"],
                 "Accuracy": "\u2713" * 5,
@@ -211,6 +218,11 @@ async def add_guess(data):
                         """,
                         values={"status": "Finished", "gameid": currGame["gameid"]},
                     )
+                    guessCount = await db.fetch_one("SELECT guesses FROM game WHERE gameid = :gameid", values={"gameid":currGame["gameid"]})
+                    gameShipment = {"user" : auth.username, "guesses" : guessCount[0]}
+                    print("Attemping to ship out data: ")
+                    print(gameShipment)
+                    r = httpx.post("http://127.0.0.1:5100/results", data=json.dumps(gameShipment), headers={'Content-Type': 'application/json'})
                     return "Max attempts.", 202
             except sqlite3.IntegrityError as e:
                 abort(404, e)
@@ -297,8 +309,21 @@ async def fullsend():
 
 @app.route("/payload", methods=["POST"])
 async def receivepayload():
+    dbList = await _get_read_dbs()
+    print("dbList: " + str(dbList))
+    db = random.choice(dbList)
+    print("db: " + str(db))
     push = await request.get_json()
+    print(push)
     app.logger.debug(json.dumps(push, indent=1))
+    Curls = await db.fetch_all("SELECT curl FROM callbackurls")
+    for url in Curls:
+        print(str(url[0]))
+        try:
+            r = await httpx.post(str(url[0]), data=json.dumps(push), headers={'Content-Type': 'application/json'})
+        except:
+            print("Failed")
+            continue
     return push, 200
 
 @app.route("/registerURL", methods=["POST"])
