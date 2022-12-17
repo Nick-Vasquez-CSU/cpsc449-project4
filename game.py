@@ -6,6 +6,7 @@ import toml
 import itertools
 import random
 import httpx
+import os
 from itertools import cycle
 from quart import Quart, abort, g, request
 from quart_schema import QuartSchema, validate_request
@@ -286,14 +287,34 @@ async def my_game():
             {"WWW-Authenticate": 'Basic realm = "Login required"'},
         )
 
+@app.route("/fullsend", methods=["POST"])
+async def fullsend():
+    envar = os.environ
+    webh = "http://127.0.0.1:5200/payload"
+    data = {'Test Successful':1}
+    r = httpx.post(webh,data=json.dumps(data), headers={'Content-Type': 'application/json'})
+    return "",200
+
+@app.route("/payload", methods=["POST"])
+async def receivepayload():
+    push = await request.get_json()
+    app.logger.debug(json.dumps(push, indent=1))
+    return push, 200
+
 @app.route("/registerURL", methods=["POST"])
 @validate_request(Url)
 async def register(data):
     auth = request.authorization
     if auth and auth.username and auth.password:
-        db = await _get_db()
+        db = await _get_write_db()
         url = dataclasses.asdict(data)
         await db.execute("INSERT INTO callbackurls(curl, username) VALUES(:curl, :username)", values={"curl":url.get('url'), "username":auth.username})
+
+#        envar = os.environ
+#        print(envar['HOSTNAME'])
+#        fqdn = socket.getfqdn(envar['HOSTNAME'])
+#        print(fqdn)
+#        leaderboardURL = 'http://'+fqdn+':5100/results'
 
         return "Registered URL",200
     else:
@@ -305,7 +326,18 @@ async def register(data):
 
 @app.route("/leaderboardConnect", methods=["POST"])
 async def leadCon():
-    return ",200"
+    auth = request.authorization
+    if auth and auth.username and auth.password:
+        db = await _get_write_db()
+        lURL = "http://127.0.0.1:5100/results"
+        await db.execute("INSERT INTO callbackurls(curl, username) VALUES(:curl, :username)", values={"curl":lURL, "username":auth.username})
+        return "", 200
+    else:
+        return (
+            {"error": "User not verified"},
+            401,
+            {"WWW-Authenticate": 'Basic realm = "Login required"'},
+        )
 
 @app.errorhandler(409)
 def conflict(e):

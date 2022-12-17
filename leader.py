@@ -18,8 +18,11 @@ QuartSchema(app)
 res = None
 while res is None:
     try:
+        res = httpx.post("http://"+socket.getfqdn("127.0.0.1:5200/fullsend"))
+        print(res)
 #    Get url and put into socket     res =
     except httpx.RequestError:
+        print("Retrying httpx in 5 seconds...")
         sleep(5)
 
 
