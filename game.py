@@ -52,6 +52,18 @@ async def _get_read_dbs():
         await db3.connect()
     return db1, db2, db3
 
+async def receivepayload(user, sentJSON):
+    dbList = await _get_read_dbs()
+    db = random.choice(dbList)
+
+    Curls = await db.fetch_all(f"SELECT curl FROM callbackurls WHERE username = {user}")
+    for url in Curls:
+        print(str(url[0]))
+        try:
+            r = await httpx.post(str(url[0]), data=sentJSON, headers={'Content-Type': 'application/json'})
+        except:
+            print("Failed")
+            continue
 
 
 @app.teardown_appcontext
@@ -138,10 +150,11 @@ async def add_guess(data):
                 abort(404, e)
 
             guessCount = await db.fetch_one("SELECT guesses FROM game WHERE gameid = :gameid", values={"gameid":currGame["gameid"]})
-            gameShipment = {"user" : auth.username, "guesses" : guessCount[0]}
+            gameShipment = {"user" : auth.username, "guesses" : guessCount[0], "status" : "Win"}
             print("Attemping to ship out data: ")
             print(gameShipment)
-            r = await httpx.post("http://127.0.0.1:5200/payload", data=json.dumps(gameShipment), headers={'Content-Type': 'application/json'})
+            r = httpx.post("http://localhost:5100/results", data=json.dumps(gameShipment), headers={'Content-Type': 'application/json'})
+            receivepayload(auth.username, gameShipment)
 
             return {
                 "guessedWord": currGame["word"],
@@ -219,10 +232,12 @@ async def add_guess(data):
                         values={"status": "Finished", "gameid": currGame["gameid"]},
                     )
                     guessCount = await db.fetch_one("SELECT guesses FROM game WHERE gameid = :gameid", values={"gameid":currGame["gameid"]})
-                    gameShipment = {"user" : auth.username, "guesses" : guessCount[0]}
+                    gameShipment = {"user" : auth.username, "guesses" : guessCount[0], "status" : "Loss"}
                     print("Attemping to ship out data: ")
                     print(gameShipment)
-                    r = httpx.post("http://127.0.0.1:5100/results", data=json.dumps(gameShipment), headers={'Content-Type': 'application/json'})
+                    r = httpx.post("http://localhost:5100/results", data=json.dumps(gameShipment), headers={'Content-Type': 'application/json'})
+                    receivepayload(auth.username, gameShipment)
+
                     return "Max attempts.", 202
             except sqlite3.IntegrityError as e:
                 abort(404, e)
@@ -299,33 +314,6 @@ async def my_game():
             {"WWW-Authenticate": 'Basic realm = "Login required"'},
         )
 
-@app.route("/fullsend", methods=["POST"])
-async def fullsend():
-    envar = os.environ
-    webh = "http://127.0.0.1:5200/payload"
-    data = {'Test Successful':1}
-    r = httpx.post(webh,data=json.dumps(data), headers={'Content-Type': 'application/json'})
-    return "",200
-
-@app.route("/payload", methods=["POST"])
-async def receivepayload():
-    dbList = await _get_read_dbs()
-    print("dbList: " + str(dbList))
-    db = random.choice(dbList)
-    print("db: " + str(db))
-    push = await request.get_json()
-    print(push)
-    app.logger.debug(json.dumps(push, indent=1))
-    Curls = await db.fetch_all("SELECT curl FROM callbackurls")
-    for url in Curls:
-        print(str(url[0]))
-        try:
-            r = await httpx.post(str(url[0]), data=json.dumps(push), headers={'Content-Type': 'application/json'})
-        except:
-            print("Failed")
-            continue
-    return push, 200
-
 @app.route("/registerURL", methods=["POST"])
 @validate_request(Url)
 async def register(data):
@@ -342,21 +330,6 @@ async def register(data):
 #        leaderboardURL = 'http://'+fqdn+':5100/results'
 
         return "Registered URL",200
-    else:
-        return (
-            {"error": "User not verified"},
-            401,
-            {"WWW-Authenticate": 'Basic realm = "Login required"'},
-        )
-
-@app.route("/leaderboardConnect", methods=["POST"])
-async def leadCon():
-    auth = request.authorization
-    if auth and auth.username and auth.password:
-        db = await _get_write_db()
-        lURL = "http://127.0.0.1:5100/results"
-        await db.execute("INSERT INTO callbackurls(curl, username) VALUES(:curl, :username)", values={"curl":lURL, "username":auth.username})
-        return "", 200
     else:
         return (
             {"error": "User not verified"},

@@ -42,75 +42,77 @@ class LeaderInfo:
 
 # Results endpoint
 
-@app.route("/results/", methods=["POST"])
+@app.route("/results", methods=["POST"])
 
-@validate_request(LeaderInfo)
+#@validate_request(LeaderInfo)
 
-async def Results(data: LeaderInfo):
+async def Results():
 
-    r = httpx.get("http://127.0.0.1:5100/results", timeout=None)
-    print(r)
-    auth = request.authorization
+#    auth = request.authorization
 
-    if auth and auth.username and auth.password:
+#    if auth and auth.username and auth.password:
+#    leaderboardData = dataclasses.asdict(data)
+    data = await request.get_json()
+    userL = data["user"]
+    guessL = data["guesses"]
+    statusL = data["status"]
+    print(data)
 
-        leaderboardData = dataclasses.asdict(data)
+    score = 0
+    count = 1
+    if statusL == "Win":
 
+        if guessL == 1:
+            score = 6
+        elif guessL == 2:
+            score = 5
+        elif guessL == 3:
+            score = 4
+        elif guessL == 4:
+            score = 3
+        elif guessL == 5:
+            score = 2
+        elif guessL == 6:
+            score = 1
+        else:
+            return {"Error": "Invalid Guesses."}, 404
+    elif statusL == "Loss":
         score = 0
-        count = 1
-        if leaderboardData["result"] == "Win":
+    else:
+        return {"Error": "Invalid Result."}, 404
 
-            if leaderboardData["guesses"] == 1:
-                score = 6
-            elif leaderboardData["guesses"] == 2:
-                score = 5
-            elif leaderboardData["guesses"] == 3:
-                score = 4
-            elif leaderboardData["guesses"] == 4:
-                score = 3
-            elif leaderboardData["guesses"] == 5:
-                score = 2
-            elif leaderboardData["guesses"] == 6:
-                score = 1
-            else:
-                return {"Error": "Invalid Guesses."}, 404
-        elif leaderboardData["result"] == "Loss":
-            score = 0
-        else:
-            return {"Error": "Invalid Result."}, 404
+    if redisClient.hget('leaderboard', 'username') == userL:
+        score = int(redisClient.hget('leaderboard', 'score')) + score
+        count = int(redisClient.hget('leaderboard', 'gamecount')) + count
+        averageScore = score / count
 
-        if redisClient.hget('leaderboard', 'username') == auth.username:
-            score = int(redisClient.hget('leaderboard', 'score')) + score
-            count = int(redisClient.hget('leaderboard', 'gamecount')) + count
-            averageScore = score / count
+        result = redisClient.hset('leaderboard', 'averageScore', averageScore)
+        result = redisClient.hset('leaderboard', 'result',statusL)
+        result = redisClient.hset('leaderboard', 'guesses',guessL)
+        result = redisClient.hset('leaderboard', 'score', score)
+        result = redisClient.hset('leaderboard', 'gamecount', count)
+        result2 = redisClient.zadd("Wordle Leaderboard", {userL: averageScore})
 
-            result = redisClient.hset('leaderboard', 'averageScore', averageScore)
-            result = redisClient.hset('leaderboard', 'result',leaderboardData["result"])
-            result = redisClient.hset('leaderboard', 'guesses',leaderboardData["guesses"])
-            result = redisClient.hset('leaderboard', 'score', score)
-            result = redisClient.hset('leaderboard', 'gamecount', count)
-            result2 = redisClient.zadd("Wordle Leaderboard", {auth.username: averageScore})
-
-
-        else:
-
-            result = redisClient.hset('leaderboard', 'username' , auth.username)
-            result = redisClient.hset('leaderboard', 'averageScore', score)
-            result = redisClient.hset('leaderboard', 'result',leaderboardData["result"])
-            result = redisClient.hset('leaderboard', 'guesses',leaderboardData["guesses"])
-            result = redisClient.hset('leaderboard', 'score', score)
-            result = redisClient.hset('leaderboard', 'gamecount', count)
-            result2 = redisClient.zadd("Wordle Leaderboard", {auth.username: score})
-
-
-        return redisClient.hgetall('leaderboard'), 200
 
     else:
-        return (
-            {"error": "User not verified"},
-            401,
-            {"WWW-Authenticate": 'Basic realm = "Login required"'},
-        )
+
+        result = redisClient.hset('leaderboard', 'username' , userL)
+        result = redisClient.hset('leaderboard', 'averageScore', score)
+        result = redisClient.hset('leaderboard', 'result',statusL)
+        result = redisClient.hset('leaderboard', 'guesses',guessL)
+        result = redisClient.hset('leaderboard', 'score', score)
+        result = redisClient.hset('leaderboard', 'gamecount', count)
+        result2 = redisClient.zadd("Wordle Leaderboard", {userL: score})
+
+
+    return redisClient.hgetall('leaderboard'), 200
+
+#    else:
+#        return (
+#            {"error": "User not verified"},
+#            401,
+#            {"WWW-Authenticate": 'Basic realm = "Login required"'},
+#        )
 
 
 @app.route("/top10scores/", methods=["GET"])
